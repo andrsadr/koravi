@@ -110,13 +110,38 @@ Solo beauty professionals who need efficient client record management without co
 - Mobile-first responsive design
 - Accessibility-compliant interface
 
+## Development Workflow
+
+We use **GitHub Flow** for development. See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+### Quick Start
+
+```bash
+# Start a new feature
+git checkout main && git pull
+git checkout -b feat/your-feature
+
+# Develop and commit
+git add .
+git commit -m "Add new functionality"
+git push -u origin feat/your-feature
+
+# Open PR, get reviews, merge
+# After merge, clean up
+git checkout main && git pull
+git branch -d feat/your-feature
+```
+
+### Branch Protection
+
+- `main` branch is protected - no direct commits allowed
+- All changes must go through Pull Requests
+- PRs require passing CI checks and code review approval
+- Automated testing runs on every PR
+
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our development workflow, coding standards, and the process for submitting pull requests.
 
 ## License
 

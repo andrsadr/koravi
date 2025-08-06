@@ -1,0 +1,22 @@
+# Global code owners
+* @andrsadr
+
+# Frontend components
+/koravi-crm/src/components/ @andrsadr
+
+# Database and backend logic
+/koravi-crm/src/lib/ @andrsadr
+/koravi-crm/database/ @andrsadr
+
+# CI/CD and workflows
+/.github/ @andrsadr
+
+# Documentation
+*.md @andrsadr
+/docs/ @andrsadr
+
+# Configuration files
+*.json @andrsadr
+*.js @andrsadr
+*.ts @andrsadr
+*.config.* @andrsadr

@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '.github/**'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'skip-release')"
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8
+        
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+      working-directory: ./koravi-crm
+      
+    - name: Build application
+      run: pnpm build
+      working-directory: ./koravi-crm
+      
+    - name: Get version from package.json
+      id: package-version
+      run: |
+        VERSION=$(node -p "require('./koravi-crm/package.json').version")
+        echo "version=v$VERSION" >> $GITHUB_OUTPUT
+        
+    - name: Check if tag exists
+      id: tag-exists
+      run: |
+        if git rev-parse "${{ steps.package-version.outputs.version }}" >/dev/null 2>&1; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Create Release
+      if: steps.tag-exists.outputs.exists == 'false'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.package-version.outputs.version }}
+        release_name: Release ${{ steps.package-version.outputs.version }}
+        body: |
+          ## Changes in this Release
+          
+          This release includes all changes merged to main since the last release.
+          
+          ### Installation
+          ```bash
+          git clone https://github.com/andrsadr/koravi.git
+          cd koravi/koravi-crm
+          pnpm install
+          pnpm dev
+          ```
+          
+          ### Full Changelog
+          See the [commit history](https://github.com/andrsadr/koravi/commits/main) for detailed changes.
+        draft: false
+        prerelease: false
