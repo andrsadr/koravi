@@ -7,6 +7,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Create clients table
 CREATE TABLE IF NOT EXISTS clients (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id SERIAL UNIQUE NOT NULL, -- Unique numeric identifier
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   
@@ -57,6 +58,7 @@ CREATE INDEX IF NOT EXISTS idx_clients_status ON clients(status);
 CREATE INDEX IF NOT EXISTS idx_clients_labels ON clients USING GIN(labels);
 CREATE INDEX IF NOT EXISTS idx_clients_updated_at ON clients(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_clients_name ON clients(first_name, last_name);
+CREATE INDEX IF NOT EXISTS idx_clients_client_id ON clients(client_id);
 
 -- Create function to automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

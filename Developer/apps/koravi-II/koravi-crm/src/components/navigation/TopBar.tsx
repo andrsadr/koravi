@@ -4,20 +4,39 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, User, Menu } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ClientService } from '@/lib/database';
 import { SearchResult, Client } from '@/lib/types';
 
 interface TopBarProps {
   isSidebarCollapsed: boolean;
   onSidebarToggle: () => void;
+  isMobileOpen?: boolean;
+  onMobileToggle?: () => void;
 }
 
-export default function TopBar({ isSidebarCollapsed, onSidebarToggle }: TopBarProps) {
+export default function TopBar({ isSidebarCollapsed, onSidebarToggle, isMobileOpen = false, onMobileToggle }: TopBarProps) {
+  const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  
+  // Check if we're on a client detail page
+  const isClientDetailPage = pathname?.match(/^\/clients\/[^\/]+$/);
+
+  // Check if we're on mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Debounced search function
   useEffect(() => {
@@ -79,7 +98,7 @@ export default function TopBar({ isSidebarCollapsed, onSidebarToggle }: TopBarPr
         {/* Left: Hamburger and Logo grouped together */}
         <div className="flex items-center">
           <button
-            onClick={onSidebarToggle}
+            onClick={isMobile ? onMobileToggle : onSidebarToggle}
             className="p-2 rounded-lg transition-all duration-200 hover:scale-105 glass-button"
             aria-label="Toggle sidebar"
           >
@@ -91,82 +110,90 @@ export default function TopBar({ isSidebarCollapsed, onSidebarToggle }: TopBarPr
           </div>
         </div>
 
-        {/* Center: Search - Absolutely positioned to center */}
-        <div className="absolute left-1/2 transform -translate-x-1/2 w-full max-w-md px-4" ref={searchRef}>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-primary-foreground/70 z-10" />
-            <input
-              type="text"
-              placeholder="Search clients..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => searchQuery && setShowResults(true)}
-              className="w-full pl-10 pr-10 py-2 rounded-lg text-primary-foreground placeholder-primary-foreground/60 glass-input"
-            />
-            {searchQuery && (
-              <button
-                onClick={clearSearch}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-primary-foreground/20 rounded transition-colors z-10"
-              >
-                <X className="w-3 h-3 text-primary-foreground/70" />
-              </button>
-            )}
+        {/* Center: Search - Only show on non-client-detail pages and adapt for mobile */}
+        {!isClientDetailPage && (
+          <div className={`${
+            isMobile 
+              ? 'flex-1 mx-4' 
+              : 'absolute left-1/2 transform -translate-x-1/2 w-full max-w-md px-4'
+          }`} ref={searchRef}>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-primary-foreground/70 z-10" />
+              <input
+                type="text"
+                placeholder={isMobile ? "Search..." : "Search clients..."}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => searchQuery && setShowResults(true)}
+                className="w-full pl-10 pr-10 py-2 rounded-lg text-primary-foreground placeholder-primary-foreground/60 glass-input text-sm"
+              />
+              {searchQuery && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-primary-foreground/20 rounded transition-colors z-10"
+                >
+                  <X className="w-3 h-3 text-primary-foreground/70" />
+                </button>
+              )}
+            </div>
+
+            {/* Search Results Dropdown */}
+            <AnimatePresence>
+              {showResults && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute top-full mt-2 w-full rounded-lg overflow-hidden z-[200] bg-popover border border-border shadow-lg"
+                >
+                  {isSearching ? (
+                    <div className="p-4 text-center text-muted-foreground">
+                      <div className="animate-spin w-4 h-4 border-2 border-muted border-t-primary rounded-full mx-auto"></div>
+                      <p className="mt-2 text-sm">Searching...</p>
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    <div className="max-h-80 overflow-y-auto">
+                      {searchResults.map((result) => (
+                        <Link
+                          key={result.id}
+                          href={result.href}
+                          onClick={() => setShowResults(false)}
+                          className="block p-3 hover:bg-accent transition-colors border-b border-border last:border-b-0"
+                        >
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center mr-3">
+                              <User className="w-4 h-4 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {result.title}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {result.subtitle}
+                              </p>
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : searchQuery ? (
+                    <div className="p-4 text-center text-muted-foreground">
+                      <p className="text-sm">No clients found for &ldquo;{searchQuery}&rdquo;</p>
+                    </div>
+                  ) : null}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
+        )}
 
-          {/* Search Results Dropdown */}
-          <AnimatePresence>
-            {showResults && (
-              <motion.div
-                initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                transition={{ duration: 0.2 }}
-                className="absolute top-full mt-2 w-full rounded-lg overflow-hidden z-[200] bg-popover border border-border shadow-lg"
-              >
-                {isSearching ? (
-                  <div className="p-4 text-center text-muted-foreground">
-                    <div className="animate-spin w-4 h-4 border-2 border-muted border-t-primary rounded-full mx-auto"></div>
-                    <p className="mt-2 text-sm">Searching...</p>
-                  </div>
-                ) : searchResults.length > 0 ? (
-                  <div className="max-h-80 overflow-y-auto">
-                    {searchResults.map((result) => (
-                      <Link
-                        key={result.id}
-                        href={result.href}
-                        onClick={() => setShowResults(false)}
-                        className="block p-3 hover:bg-accent transition-colors border-b border-border last:border-b-0"
-                      >
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center mr-3">
-                            <User className="w-4 h-4 text-primary" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">
-                              {result.title}
-                            </p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {result.subtitle}
-                            </p>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                ) : searchQuery ? (
-                  <div className="p-4 text-center text-muted-foreground">
-                    <p className="text-sm">No clients found for &ldquo;{searchQuery}&rdquo;</p>
-                  </div>
-                ) : null}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Right: Empty space to balance layout */}
-        <div className="flex items-center">
-          <div className="w-16"></div>
-        </div>
+        {/* Right: Empty space to balance layout - hide on mobile when search is present */}
+        {!isMobile && (
+          <div className="flex items-center">
+            <div className="w-16"></div>
+          </div>
+        )}
       </div>
     </header>
     </>

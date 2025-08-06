@@ -1,6 +1,7 @@
 import { supabase, withRetry } from './supabase';
 import { Client, ClientFormData } from './types';
 import { Database } from './database.types';
+import { withCache, cacheKeys, invalidateCache } from './cache';
 
 // Type aliases for cleaner code
 type ClientInsert = Database['public']['Tables']['clients']['Insert'];
@@ -28,93 +29,101 @@ export class ClientService {
     limit?: number;
     offset?: number;
   }): Promise<Client[]> {
-    try {
-      return await withRetry(async () => {
-        let query = supabase
-          .from('clients')
-          .select('*')
-          .order('updated_at', { ascending: false });
+    const cacheKey = cacheKeys.clients(options);
+    
+    return withCache(cacheKey, async () => {
+      try {
+        return await withRetry(async () => {
+          let query = supabase
+            .from('clients')
+            .select('*')
+            .order('updated_at', { ascending: false });
 
-        // Apply filters
-        if (options?.search) {
-          query = query.textSearch('search_vector', options.search);
+          // Apply filters
+          if (options?.search) {
+            query = query.textSearch('search_vector', options.search);
+          }
+
+          if (options?.status && ['active', 'inactive', 'archived'].includes(options.status)) {
+            query = query.eq('status', options.status as 'active' | 'inactive' | 'archived');
+          }
+
+          if (options?.labels && options.labels.length > 0) {
+            query = query.overlaps('labels', options.labels);
+          }
+
+          if (options?.limit) {
+            query = query.limit(options.limit);
+          }
+
+          if (options?.offset) {
+            query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+          }
+
+          const { data, error } = await query;
+
+          if (error) {
+            throw new DatabaseError(
+              `Failed to fetch clients: ${error.message}`,
+              error.code,
+              error
+            );
+          }
+
+          return data || [];
+        });
+      } catch (error) {
+        if (error instanceof DatabaseError) {
+          throw error;
         }
-
-        if (options?.status && ['active', 'inactive', 'archived'].includes(options.status)) {
-          query = query.eq('status', options.status as 'active' | 'inactive' | 'archived');
-        }
-
-        if (options?.labels && options.labels.length > 0) {
-          query = query.overlaps('labels', options.labels);
-        }
-
-        if (options?.limit) {
-          query = query.limit(options.limit);
-        }
-
-        if (options?.offset) {
-          query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
-        }
-
-        const { data, error } = await query;
-
-        if (error) {
-          throw new DatabaseError(
-            `Failed to fetch clients: ${error.message}`,
-            error.code,
-            error
-          );
-        }
-
-        return data || [];
-      });
-    } catch (error) {
-      if (error instanceof DatabaseError) {
-        throw error;
+        throw new DatabaseError(
+          `Unexpected error fetching clients: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
-      throw new DatabaseError(
-        `Unexpected error fetching clients: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
+    }, options?.search ? 2 * 60 * 1000 : 5 * 60 * 1000); // Shorter cache for search results
   }
 
   // Get a single client by ID
   static async getClient(id: string): Promise<Client | null> {
-    try {
-      return await withRetry(async () => {
-        const { data, error } = await supabase
-          .from('clients')
-          .select('*')
-          .eq('id', id)
-          .single();
+    const cacheKey = cacheKeys.client(id);
+    
+    return withCache(cacheKey, async () => {
+      try {
+        return await withRetry(async () => {
+          const { data, error } = await supabase
+            .from('clients')
+            .select('*')
+            .eq('id', id)
+            .single();
 
-        if (error) {
-          if (error.code === 'PGRST116') {
-            return null; // Client not found
+          if (error) {
+            if (error.code === 'PGRST116') {
+              return null; // Client not found
+            }
+            throw new DatabaseError(
+              `Failed to fetch client: ${error.message}`,
+              error.code,
+              error
+            );
           }
-          throw new DatabaseError(
-            `Failed to fetch client: ${error.message}`,
-            error.code,
-            error
-          );
-        }
 
-        return data;
-      });
-    } catch (error) {
-      if (error instanceof DatabaseError) {
-        throw error;
+          return data;
+        });
+      } catch (error) {
+        if (error instanceof DatabaseError) {
+          throw error;
+        }
+        throw new DatabaseError(
+          `Unexpected error fetching client: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
-      throw new DatabaseError(
-        `Unexpected error fetching client: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
+    }, 10 * 60 * 1000); // 10 minutes cache for individual clients
   }
 
   // Create a new client
   static async createClient(clientData: ClientFormData): Promise<Client> {
     try {
-      return await withRetry(async () => {
+      const result = await withRetry(async () => {
         const insertData: ClientInsert = {
           ...clientData,
           labels: clientData.labels || [],
@@ -138,6 +147,12 @@ export class ClientService {
 
         return data;
       });
+
+      // Invalidate relevant caches
+      invalidateCache('clients');
+      invalidateCache('client-stats');
+
+      return result;
     } catch (error) {
       if (error instanceof DatabaseError) {
         throw error;
@@ -151,7 +166,7 @@ export class ClientService {
   // Update an existing client
   static async updateClient(id: string, updates: Partial<ClientFormData>): Promise<Client> {
     try {
-      return await withRetry(async () => {
+      const result = await withRetry(async () => {
         const updateData: ClientUpdate = {
           ...updates,
           updated_at: new Date().toISOString(),
@@ -174,6 +189,13 @@ export class ClientService {
 
         return data;
       });
+
+      // Invalidate relevant caches
+      invalidateCache('clients');
+      invalidateCache(`client:${id}`);
+      invalidateCache('client-stats');
+
+      return result;
     } catch (error) {
       if (error instanceof DatabaseError) {
         throw error;
@@ -187,7 +209,7 @@ export class ClientService {
   // Delete a client
   static async deleteClient(id: string): Promise<void> {
     try {
-      return await withRetry(async () => {
+      await withRetry(async () => {
         const { error } = await supabase
           .from('clients')
           .delete()
@@ -201,6 +223,11 @@ export class ClientService {
           );
         }
       });
+
+      // Invalidate relevant caches
+      invalidateCache('clients');
+      invalidateCache(`client:${id}`);
+      invalidateCache('client-stats');
     } catch (error) {
       if (error instanceof DatabaseError) {
         throw error;
@@ -213,33 +240,37 @@ export class ClientService {
 
   // Search clients with full-text search
   static async searchClients(query: string, limit: number = 10): Promise<Client[]> {
-    try {
-      return await withRetry(async () => {
-        const { data, error } = await supabase
-          .from('clients')
-          .select('*')
-          .textSearch('search_vector', query)
-          .limit(limit)
-          .order('updated_at', { ascending: false });
+    const cacheKey = cacheKeys.search(query, limit);
+    
+    return withCache(cacheKey, async () => {
+      try {
+        return await withRetry(async () => {
+          const { data, error } = await supabase
+            .from('clients')
+            .select('*')
+            .textSearch('search_vector', query)
+            .limit(limit)
+            .order('updated_at', { ascending: false });
 
-        if (error) {
-          throw new DatabaseError(
-            `Failed to search clients: ${error.message}`,
-            error.code,
-            error
-          );
+          if (error) {
+            throw new DatabaseError(
+              `Failed to search clients: ${error.message}`,
+              error.code,
+              error
+            );
+          }
+
+          return data || [];
+        });
+      } catch (error) {
+        if (error instanceof DatabaseError) {
+          throw error;
         }
-
-        return data || [];
-      });
-    } catch (error) {
-      if (error instanceof DatabaseError) {
-        throw error;
+        throw new DatabaseError(
+          `Unexpected error searching clients: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
-      throw new DatabaseError(
-        `Unexpected error searching clients: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
+    }, 2 * 60 * 1000); // 2 minutes cache for search results
   }
 
   // Get client statistics
@@ -249,40 +280,53 @@ export class ClientService {
     inactive: number;
     archived: number;
   }> {
-    try {
-      return await withRetry(async () => {
-        const { data, error } = await supabase
-          .from('clients')
-          .select('status');
+    const cacheKey = cacheKeys.clientStats();
+    
+    return withCache(cacheKey, async () => {
+      try {
+        return await withRetry(async () => {
+          const { data, error } = await supabase
+            .from('clients')
+            .select('status');
 
-        if (error) {
-          throw new DatabaseError(
-            `Failed to fetch client statistics: ${error.message}`,
-            error.code,
-            error
-          );
-        }
+          if (error) {
+            throw new DatabaseError(
+              `Failed to fetch client statistics: ${error.message}`,
+              error.code,
+              error
+            );
+          }
 
-        const stats = {
-          total: data?.length || 0,
-          active: 0,
-          inactive: 0,
-          archived: 0,
-        };
+          const stats = {
+            total: data?.length || 0,
+            active: 0,
+            inactive: 0,
+            archived: 0,
+          };
 
-        data?.forEach(client => {
-          stats[client.status as keyof typeof stats]++;
+          data?.forEach(client => {
+            stats[client.status as keyof typeof stats]++;
+          });
+
+          return stats;
         });
-
-        return stats;
-      });
-    } catch (error) {
-      if (error instanceof DatabaseError) {
-        throw error;
+      } catch (error) {
+        if (error instanceof DatabaseError) {
+          throw error;
+        }
+        throw new DatabaseError(
+          `Unexpected error fetching statistics: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
-      throw new DatabaseError(
-        `Unexpected error fetching statistics: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
+    }, 10 * 60 * 1000); // 10 minutes cache for stats
   }
 }
+
+// Convenience functions for backward compatibility
+export const getClients = ClientService.getClients;
+export const getClient = ClientService.getClient;
+export const createClient = ClientService.createClient;
+export const updateClient = ClientService.updateClient;
+export const deleteClient = ClientService.deleteClient;
+export const searchClients = ClientService.searchClients;
+export const getClientStats = ClientService.getClientStats;

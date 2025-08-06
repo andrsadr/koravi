@@ -1,0 +1,97 @@
+# Page snapshot
+
+```yaml
+- link "Skip to main content":
+  - /url: "#main-content"
+- link "Skip to navigation":
+  - /url: "#navigation"
+- navigation "Main navigation":
+  - navigation:
+    - link "Dashboard":
+      - /url: /
+    - link "Clients":
+      - /url: /clients
+- banner:
+  - button "Toggle sidebar"
+  - text: Koravi
+  - textbox "Search clients..."
+- main "Main content":
+  - text: Connected
+  - heading "Clients" [level=2]
+  - text: 8 clients
+  - button "Filter by"
+  - textbox "Search clients..."
+  - button "Switch to grid view"
+  - button "Add Client"
+  - button
+  - table:
+    - rowgroup:
+      - row "Client Name Email Client ID":
+        - cell:
+          - button
+        - cell "Client Name":
+          - button "Client Name"
+          - button:
+            - img
+        - cell "Email":
+          - button "Email"
+          - button:
+            - img
+        - cell "Client ID":
+          - button "Client ID"
+          - button:
+            - img
+    - rowgroup:
+      - 'row "AA Andy Agurto xandresagurto@gmail.com #0671"':
+        - cell:
+          - button
+        - cell "AA Andy Agurto"
+        - cell "xandresagurto@gmail.com"
+        - cell "#0671"
+      - 'row "JS Jane Smith jane.smith@example.com #0617"':
+        - cell:
+          - button
+        - cell "JS Jane Smith"
+        - cell "jane.smith@example.com"
+        - cell "#0617"
+      - 'row "SJ Sarah Johnson sarah.j@example.com #0508"':
+        - cell:
+          - button
+        - cell "SJ Sarah Johnson"
+        - cell "sarah.j@example.com"
+        - cell "#0508"
+      - 'row "JD John Doe john.doe@example.com #0601"':
+        - cell:
+          - button
+        - cell "JD John Doe"
+        - cell "john.doe@example.com"
+        - cell "#0601"
+      - 'row "MW Mike Wilson mike.wilson@example.com #0577"':
+        - cell:
+          - button
+        - cell "MW Mike Wilson"
+        - cell "mike.wilson@example.com"
+        - cell "#0577"
+      - 'row "JS Jane Smith jane.smith@example.com #0550"':
+        - cell:
+          - button
+        - cell "JS Jane Smith"
+        - cell "jane.smith@example.com"
+        - cell "#0550"
+      - 'row "SJ Sarah Johnson sarah.j@example.com #0455"':
+        - cell:
+          - button
+        - cell "SJ Sarah Johnson"
+        - cell "sarah.j@example.com"
+        - cell "#0455"
+      - 'row "JD John Doe john.doe@example.com #0563"':
+        - cell:
+          - button
+        - cell "JD John Doe"
+        - cell "john.doe@example.com"
+        - cell "#0563"
+  - status
+- region "Notifications (F8)":
+  - list
+- alert
+```

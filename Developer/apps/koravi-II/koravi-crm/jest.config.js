@@ -20,7 +20,12 @@ const customJestConfig = {
     '!src/**/*.stories.{js,jsx,ts,tsx}',
     '!src/__tests__/e2e/**', // Exclude e2e tests from coverage
   ],
-
+  transformIgnorePatterns: [
+    'node_modules/(?!(isows|@supabase|@dnd-kit)/)'
+  ],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+  },
 }
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async

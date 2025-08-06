@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
-import AppLayout from "@/components/layout/AppLayout";
+import ConditionalLayout from "@/components/layout/ConditionalLayout";
+import { Toaster } from "@/components/ui/toaster";
+import { ReducedMotionProvider } from "@/components/ui/ReducedMotion";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { PerformanceMonitor } from "@/components/ui/PerformanceMonitor";
 
 const outfit = Outfit({
   variable: "--font-sans",
@@ -23,9 +27,15 @@ export default function RootLayout({
       <body
         className={`${outfit.variable} font-sans antialiased`}
       >
-        <AppLayout>
-          {children}
-        </AppLayout>
+        <PerformanceMonitor />
+        <ReducedMotionProvider>
+          <ErrorBoundary>
+            <ConditionalLayout>
+              {children}
+            </ConditionalLayout>
+          </ErrorBoundary>
+          <Toaster />
+        </ReducedMotionProvider>
       </body>
     </html>
   );

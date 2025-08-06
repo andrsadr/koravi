@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Kiro Completion Sound",
+  "description": "Plays a subtle sound notification when Kiro finishes outputting a request response",
+  "version": "1",
+  "when": {
+    "type": "fileCreated",
+    "patterns": [
+      ".kiro/**/*"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Play a subtle, pleasant notification sound to indicate that Kiro has finished processing and outputting the response to the user's request. Use a gentle chime or soft bell sound that is noticeable but not jarring."
+  }
+}
